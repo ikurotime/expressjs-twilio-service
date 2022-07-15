@@ -73,8 +73,8 @@ app.get("/create-server", async (req, res) => {
           .conversations(conversation.sid)
           .participants
           .create({identity})
-          addToDatabase('channels',  { channel_sid: conversation.sid,created_by:req.headers?.uid, server_sid: service.sid,channel_friendly_name: 'general' })
-          addToDatabase('members', { user_id: req.headers.uid, server_sid: service.sid })
+          await addToDatabase('members', { user_id: req.headers.uid, server_sid: service.sid })
+          await addToDatabase('channels',  { channel_sid: conversation.sid,created_by:req.headers?.uid, server_sid: service.sid,channel_friendly_name: 'general' })
           addToDatabase('channel_members', { user_id: req.headers.uid, channel_id: conversation.sid })
         res.send({ serverSid: service.sid, conversation: conversation })
 
@@ -104,6 +104,7 @@ app.get("/get-access-token", async (req, res) => {
 	if (jwt.startsWith('anonymous')) {
 		identity = jwt.split('_')[1];
 	} else {
+    console.log(jwt)
 		const { data } = await supabase.auth.api.getUser(jwt);
 		identity = data!.user_metadata.full_name;
 	}
@@ -113,7 +114,7 @@ app.get("/get-access-token", async (req, res) => {
 	const accessToken = new AccessToken(accountSid, twilioApiKey, twilioApiSecret, {
 		identity
 	});
-
+  console.log(accessToken)
 	const conversationGrant = new ChatGrant({
 		serviceSid: SERVICE_SID
 	});
@@ -123,6 +124,26 @@ app.get("/get-access-token", async (req, res) => {
     accessToken: accessToken.toJwt(),
     identity
   });
+})
+// Get User Conversations
+app.get("/get-user-conversations", async (req, res) => {
+  const { data } = await supabase
+  .from('servers')
+		.select('friendly_name, SID, channels(channel_friendly_name, channel_sid)')
+    .eq('SID', req.headers?.serversid)
+  if(data!.length == 0) return res.status(403).send('User is not a member of any server')
+  const channels: string[] = [];
+  data![0].channels.forEach((channel:{channel_friendly_name:string,channel_sid:string}) => {
+    channels.push(channel.channel_sid)
+  });
+  const conversations: any[] = [];
+  channels.map(async (channel:string) => {
+    await client.conversations.v1.services(req.headers.serversid).conversations(channel)
+    .fetch()
+    .then((conversation: any) => {
+      conversations.push(conversation)
+      res.status(200).send(conversations)
+    })});
 })
 // Get all servers
 app.get("/get-all-servers", async (req, res) => {
