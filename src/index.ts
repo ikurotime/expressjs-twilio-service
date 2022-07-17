@@ -54,7 +54,7 @@ app.get("/create-server", async (req, res) => {
 		identity = access_token.split('_')[1];
 	} else {
 		const { data } = await supabase.auth.api.getUser(access_token);
-		identity = data!.user_metadata.full_name;
+		identity = data?.user_metadata.full_name;
 	}
 
   client.conversations.v1.services.create({friendlyName: req.headers?.friendlyname, uniqueName: req.headers?.uniquename})
@@ -106,7 +106,7 @@ app.get("/get-access-token", async (req, res) => {
 	} else {
     console.log(jwt)
 		const { data } = await supabase.auth.api.getUser(jwt);
-		identity = data!.user_metadata.full_name;
+		identity = data?.user_metadata.full_name;
 	}
 
 	if (identity == null )return res.status(401)
@@ -158,7 +158,7 @@ app.get("/add-participant", async (req, res) => {
   console.log('identity:' ,req.headers.identity)
   client.conversations.v1.services(req.headers?.serversid).conversations(req.headers?.conversationsid).participants.create({identity: req.headers?.identity})
   addToDatabase('members', { user_id: req.headers.uid, server_sid: req.headers?.serversid})
-  addToDatabase('channel_members', { user_id: req.headers?.uid, channel_id: req.headers?.conversationsid })
+  addToDatabase('channel_members', { user_id: req.headers?.uid, channel_id: req.headers?.conversationsid, server_sid: req.headers?.serversid })
   res.status(200).send()
 })
 
