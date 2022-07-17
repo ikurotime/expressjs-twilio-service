@@ -59,7 +59,7 @@ app.get("/create-server", async (req, res) => {
   client.conversations.v1.services.create({friendlyName: req.headers?.friendlyname, uniqueName: req.headers?.uniquename})
   .then(async (service: { sid: string; }) => {
     try {
-      addToDatabase('servers',{ friendly_name: req.headers.friendlyname,unique_name: req.headers.uniquename, SID: service.sid,created_by: req.headers.uid })
+      addToDatabase('servers',{ friendly_name: req.headers.friendlyname,unique_name: req.headers.uniquename, id: service.sid})
     } catch (error) {
       res.send(error)
     }
@@ -73,7 +73,7 @@ app.get("/create-server", async (req, res) => {
           .participants
           .create({identity})
           await addToDatabase('server_members', { user_id: req.headers.uid, server_id: service.sid })
-          await addToDatabase('channels',  { channel_id: conversation.sid,created_by:req.headers?.uid, server_id: service.sid,friendly_name: 'general' })
+          await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'general' })
           addToDatabase('channel_members', { user_id: req.headers.uid, channel_id: conversation.sid,server_id: service.sid })
         res.send({ serverSid: service.sid, conversation: conversation })
 
@@ -128,7 +128,7 @@ app.get("/get-access-token", async (req, res) => {
 app.get("/get-user-conversations", async (req, res) => {
   const { data } = await supabase
   .from('servers')
-		.select('friendly_name, id, channels(friendly_name, channel_id)')
+		.select('friendly_name, id, channels(friendly_name,id)')
     .eq('id', req.headers?.serversid)
   if(data!.length == 0) return res.status(403).send('User is not a member of any server')
   const channels: string[] = [];
