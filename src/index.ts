@@ -56,7 +56,6 @@ app.get("/create-server", async (req, res) => {
 		const { data } = await supabase.auth.api.getUser(access_token);
 		identity = data?.user_metadata.full_name;
 	}
-
   client.conversations.v1.services.create({friendlyName: req.headers?.friendlyname, uniqueName: req.headers?.uniquename})
   .then(async (service: { sid: string; }) => {
     try {
@@ -75,7 +74,7 @@ app.get("/create-server", async (req, res) => {
           .create({identity})
           await addToDatabase('members', { user_id: req.headers.uid, server_sid: service.sid })
           await addToDatabase('channels',  { channel_sid: conversation.sid,created_by:req.headers?.uid, server_sid: service.sid,channel_friendly_name: 'general' })
-          addToDatabase('channel_members', { user_id: req.headers.uid, channel_id: conversation.sid })
+          addToDatabase('channel_members', { user_id: req.headers.uid, channel_id: conversation.sid,server_sid: service.sid })
         res.send({ serverSid: service.sid, conversation: conversation })
 
         } catch (error) {
