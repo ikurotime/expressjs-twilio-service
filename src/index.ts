@@ -61,7 +61,9 @@ app.post("/create-server", async (req, res) => {
   client.conversations.v1.services.create({friendlyName: req.body?.friendlyName, uniqueName: req.body?.uniqueName})
   .then(async (service: { sid: string; }) => {
     try {
-      addToDatabase('servers',{ friendly_name: req.body.friendlyName,unique_name: req.body.uniqueName, id: service.sid})
+      const invitationCode = Math.random().toString(16).substring(2, 8) + Math.random().toString(16).substring(2, 8);
+
+      addToDatabase('servers',{ friendly_name: req.body.friendlyName,unique_name: req.body.uniqueName, id: service.sid, invite_code: invitationCode})
     } catch (error) {
       res.send(error)
     }
@@ -75,7 +77,7 @@ app.post("/create-server", async (req, res) => {
           .participants
           .create({identity})
           await addToDatabase('server_members', { user_id: req.body.uid, server_id: service.sid })
-          await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'general' })
+          await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'general', description: 'You can talk about everything here!' })
           addToDatabase('channel_members', { user_id: req.body.uid, channel_id: conversation.sid,server_id: service.sid })
         res.send({ serverSid: service.sid, conversation: conversation })
 
@@ -162,11 +164,11 @@ app.post("/add-participant", async (req, res) => {
   console.log(req.body)
 
   console.log('serverSid:' ,req.body.serverSid)
-  console.log('conversationsid: ',req.body.conversationsid)
+  console.log('conversationsid: ',req.body.conversationSid)
   console.log('identity:' ,req.body.identity)
-  client.conversations.v1.services(req.body?.serverSid).conversations(req.body?.conversationsid).participants.create({identity: req.body?.identity})
+  client.conversations.v1.services(req.body?.serverSid).conversations(req.body?.conversationSid).participants.create({identity: req.body?.identity})
   addToDatabase('server_members', { user_id: req.body.uid, server_id: req.body?.serverSid})
-  addToDatabase('channel_members', { user_id: req.body?.uid, channel_id: req.body?.conversationsid, server_id: req.body?.serverSid })
+  addToDatabase('channel_members', { user_id: req.body?.uid, channel_id: req.body?.conversationSid, server_id: req.body?.serverSid })
   res.status(200).send()
 })
 
