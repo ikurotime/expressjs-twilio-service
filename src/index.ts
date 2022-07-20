@@ -23,8 +23,14 @@ var cors = require('cors')
 
 const app = express();
 const port = process.env.PORT || 3333;
+
 const addToDatabase = async (database: string,query: any) => {
   const {data,error} = await supabase.from(database).insert([ query ])
+  console.log(data)
+  console.log(error)
+}
+const removeFromDatabase = async (database: string,query: any) => {
+  const {data,error} = await supabase.from(database).delete(query)
   console.log(data)
   console.log(error)
 }
@@ -51,9 +57,9 @@ app.post("/create-server", async (req, res) => {
   if(data!.length > 0) return res.status(403).send('Server already exists')
 
   let identity:string;
-  console.log(access_token)
+
   if (access_token.startsWith('anonymous')) {
-		identity = access_token.split('_')[1];
+		identity = access_token.split('anonymous_')[1];
 	} else {
 		const { data } = await supabase.auth.api.getUser(access_token);
 		identity = data?.user_metadata.full_name;
@@ -91,7 +97,15 @@ app.post("/create-server", async (req, res) => {
     }
   }); 
 });
+// Delete server
+app.post("/delete-server", async (req, res) => {
+  await supabase.from('channel_members').delete().match({ server_id: req.body?.serverSid })
+  await supabase.from('channels').delete().match({ server_id: req.body?.serverSid })
+  await supabase.from('server_members').delete().match({ server_id: req.body?.serverSid })
 
+  client.conversations.v1.services(req.body?.serverSid).remove();
+  res.status(200).send()
+})
 // Get access-token
 app.post("/get-access-token", async (req, res) => {
   console.log(req.body)
@@ -106,9 +120,8 @@ app.post("/get-access-token", async (req, res) => {
 		 if the user is not anonymous we can get the identity directly from Supabase
 	*/
 	if (jwt.startsWith('anonymous')) {
-		identity = jwt.split('_')[1];
+		identity = jwt.split('anonymous_')[1];
 	} else {
-    console.log(jwt)
 		const { data } = await supabase.auth.api.getUser(jwt);
 		identity = data?.user_metadata.full_name;
 	}
@@ -171,6 +184,20 @@ app.post("/add-participant", async (req, res) => {
   addToDatabase('channel_members', { user_id: req.body?.uid, channel_id: req.body?.conversationSid, server_id: req.body?.serverSid })
   res.status(200).send()
 })
+
+// Remove participant
+app.post("/remove-participant", async (req, res) => {
+  console.log(req.body)
+
+  console.log('serverSid:' ,req.body.serverSid)
+  console.log('conversationsid: ',req.body.conversationSid)
+  console.log('identity:' ,req.body.identity)
+  client.conversations.v1.services(req.body?.serverSid).conversations(req.body?.conversationSid).participants.remove({identity: req.body?.identity})
+  removeFromDatabase('server_members', { user_id: req.body.uid, server_id: req.body?.serverSid})
+  removeFromDatabase('channel_members', { user_id: req.body?.uid, channel_id: req.body?.conversationSid, server_id: req.body?.serverSid })
+  res.status(200).send()
+})
+
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
