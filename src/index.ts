@@ -125,8 +125,10 @@ app.post("/create-server", async (req, res) => {
           .create({identity})
           await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'general', description: 'You can talk about everything here!' })
           await addToDatabase('channel_members', { user_id: req.body.uid, channel_id: conversation.sid,server_id: service.sid })
-        res.send({ serverSid: service.sid, conversation: conversation })
-
+          //wait two seconds to make sure the channel is created
+          setTimeout(() => {
+             res.send({ serverSid: service.sid, conversation: conversation })
+          }, 1000);
         } catch (error) {
           res.send(error)
         }
@@ -247,7 +249,10 @@ app.post("/add-participant", async (req, res) => {
     await addToDatabase('channel_members', { user_id: req.body.uid, channel_id: channel.id,server_id: req.body?.serverSid })
   }
   )
+  //wait two seconds to make sure the channel is created
+  setTimeout(() => {
   res.status(200).send()
+  }, 1000);
 })
 
 // Remove participant
