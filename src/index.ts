@@ -69,7 +69,48 @@ app.post("/create-server", async (req, res) => {
     try {
       const invitationCode = Math.random().toString(16).substring(2, 8) + Math.random().toString(16).substring(2, 8);
 
-      addToDatabase('servers',{ friendly_name: req.body.friendlyName,unique_name: req.body.uniqueName, id: service.sid, invite_code: invitationCode})
+      await addToDatabase('servers',{ friendly_name: req.body.friendlyName,unique_name: req.body.uniqueName, id: service.sid, invite_code: invitationCode})
+    } catch (error) {
+      res.send(error)
+    }
+    await addToDatabase('server_members', { user_id: req.body.uid, server_id: service.sid })
+    try {
+      client.conversations.v1.services(service.sid)
+      .conversations
+      .create({uniqueName:'presentations',friendlyName:'presentations'}).then(async (conversation: { sid: string; }) => {
+        try {
+          await client.conversations.v1.services(service.sid)
+          .conversations(conversation.sid)
+          .participants
+          .create({identity})
+
+          await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'presentations', description: 'Present yourself. Nice to meet you!' })
+          await addToDatabase('channel_members', { user_id: req.body.uid, channel_id: conversation.sid,server_id: service.sid })
+        } catch (error) {
+          res.send(error)
+        }
+      }
+      )
+    } catch (error) {
+      res.send(error)
+    }
+    try {
+      client.conversations.v1.services(service.sid)
+      .conversations
+      .create({uniqueName:'coding',friendlyName:'coding'}).then(async (conversation: { sid: string; }) => {
+        try {
+          await client.conversations.v1.services(service.sid)
+          .conversations(conversation.sid)
+          .participants
+          .create({identity})
+          await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'coding', description: 'Lets talk about #programming' })
+          await addToDatabase('channel_members', { user_id: req.body.uid, channel_id: conversation.sid,server_id: service.sid })
+
+        } catch (error) {
+          res.send(error)
+        }
+      }
+      )
     } catch (error) {
       res.send(error)
     }
@@ -82,9 +123,8 @@ app.post("/create-server", async (req, res) => {
           .conversations(conversation.sid)
           .participants
           .create({identity})
-          await addToDatabase('server_members', { user_id: req.body.uid, server_id: service.sid })
           await addToDatabase('channels',  { id: conversation.sid, server_id: service.sid,friendly_name: 'general', description: 'You can talk about everything here!' })
-          addToDatabase('channel_members', { user_id: req.body.uid, channel_id: conversation.sid,server_id: service.sid })
+          await addToDatabase('channel_members', { user_id: req.body.uid, channel_id: conversation.sid,server_id: service.sid })
         res.send({ serverSid: service.sid, conversation: conversation })
 
         } catch (error) {
@@ -142,6 +182,26 @@ app.post("/get-access-token", async (req, res) => {
     identity
   });
 })
+// Create channel
+app.post("/create-channel", async (req, res) => {
+  const serversid = req.body?.serverSid as string
+  const channelname = req.body?.channelName as string
+  const channeldescription = req.body?.channelDescription as string
+  client.conversations.v1.services(serversid)
+  .conversations
+  .create({uniqueName:channelname,friendlyName:channelname})
+  .then(async (conversation: { sid: string; }) => {
+    try {
+      await addToDatabase('channels',  { id: conversation.sid, server_id: serversid,friendly_name: channelname, description: channeldescription })
+      // get members of server
+      const { data } = await supabase.from('server_members').select('user_id').match({ server_id: serversid })
+      res.send({ conversation: conversation })
+    } catch (error) {
+      res.send(error)
+    }
+  }
+  )
+})
 // Get User Conversations
 app.post("/get-user-conversations", async (req, res) => {
   console.log(req.body)
@@ -179,9 +239,14 @@ app.post("/add-participant", async (req, res) => {
   console.log('serverSid:' ,req.body.serverSid)
   console.log('conversationsid: ',req.body.conversationSid)
   console.log('identity:' ,req.body.identity)
-  client.conversations.v1.services(req.body?.serverSid).conversations(req.body?.conversationSid).participants.create({identity: req.body?.identity})
-  addToDatabase('server_members', { user_id: req.body.uid, server_id: req.body?.serverSid})
-  addToDatabase('channel_members', { user_id: req.body?.uid, channel_id: req.body?.conversationSid, server_id: req.body?.serverSid })
+  await addToDatabase('server_members', { user_id: req.body.uid, server_id: req.body?.serverSid})
+  //get all channels from server
+  const { data } = await supabase.from('channels').select('id').match({ server_id: req.body?.serverSid })
+  data!.forEach(async (channel: { id: string; }) => {
+    client.conversations.v1.services(req.body?.serverSid).conversations(channel.id).participants.create({identity: req.body?.identity})
+    await addToDatabase('channel_members', { user_id: req.body.uid, channel_id: channel.id,server_id: req.body?.serverSid })
+  }
+  )
   res.status(200).send()
 })
 
