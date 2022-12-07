@@ -1,5 +1,5 @@
 import "https://deno.land/x/dotenv/load.ts";
-import cors from "npm:cors"
+import { oakCors } from "https://deno.land/x/cors/mod.ts";
 import twilio from "npm:twilio";
 
 import express from "npm:express";
@@ -33,7 +33,7 @@ const removeFromDatabase = async (database: string,query: any) => {
   console.log(error)
 }
 
-app.use(cors())
+app.use(oakCors())
 
 
 // Create server
