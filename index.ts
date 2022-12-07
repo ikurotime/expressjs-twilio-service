@@ -1,7 +1,7 @@
 import "https://deno.land/x/dotenv/load.ts";
 import cors from "npm:cors"
 import twilio from "npm:twilio";
-import bodyParser from "npm:body-parser";
+
 import express from "npm:express";
 import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js";
 
@@ -34,9 +34,7 @@ const removeFromDatabase = async (database: string,query: any) => {
 }
 
 app.use(cors())
-app.use(bodyParser.json());
-app.use(bodyParser.raw({ type: "application/vnd.custom-type" }));
-app.use(bodyParser.text({ type: "text/html" }));
+
 
 // Create server
 app.post("/create-server", async (req: { body: { access_token: string; friendlyName: any; uniqueName: any; uid: any; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (arg0: string): any; new(): any; }; }; send: (arg0: { serverSid: string; conversation: { sid: string; }; }) => void; }) => {
