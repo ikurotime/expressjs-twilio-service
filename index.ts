@@ -1,28 +1,26 @@
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
-import bodyParser from "body-parser";
-import express from "express";
-import { createClient } from "@supabase/supabase-js";
+import "https://deno.land/x/dotenv/load.ts";
+import cors from "npm:cors"
+import twilio from "npm:twilio";
+import bodyParser from "npm:body-parser";
+import express from "npm:express";
+import { createClient } from "npm:@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseToken = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE;
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+//const supabaseToken = Deno.env.get("SUPABASE_ANON_KEY");
+const supabaseServiceRole = Deno.env.get("SUPABASE_SERVICE_ROLE");
 
 const supabase = createClient(supabaseUrl!, supabaseServiceRole!);
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const twilioApiKey = process.env.TWILIO_API_KEY;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioApiSecret = process.env.TWILIO_API_SECRET;
+const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+const twilioApiKey = Deno.env.get("TWILIO_API_KEY");
+const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
 
-const client = require('twilio')(accountSid, authToken);
-const AccessToken = require('twilio').jwt.AccessToken;
+const client = new twilio(accountSid, authToken);
+const AccessToken = twilio.jwt.AccessToken;
 const ChatGrant = AccessToken.ChatGrant;
 
-var cors = require('cors')
-
 const app = express();
-const port = process.env.PORT || 3333;
+const port = Deno.env.get("PORT") || 3333;
 
 const addToDatabase = async (database: string,query: any) => {
   const {data,error} = await supabase.from(database).insert([ query ])
@@ -41,7 +39,7 @@ app.use(bodyParser.raw({ type: "application/vnd.custom-type" }));
 app.use(bodyParser.text({ type: "text/html" }));
 
 // Create server
-app.post("/create-server", async (req, res) => {
+app.post("/create-server", async (req: { body: { access_token: string; friendlyName: any; uniqueName: any; uid: any; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (arg0: string): any; new(): any; }; }; send: (arg0: { serverSid: string; conversation: { sid: string; }; }) => void; }) => {
   console.log(req.body)
 
   const access_token = req.body?.access_token as string
@@ -61,8 +59,8 @@ app.post("/create-server", async (req, res) => {
   if (access_token.startsWith('anonymous')) {
 		identity = access_token.split('anonymous_')[1];
 	} else {
-		const { data } = await supabase.auth.api.getUser(access_token);
-		identity = data?.user_metadata.full_name;
+		const { data } = await supabase.auth.getUser(access_token);
+		identity = data?.user?.user_metadata.full_name;
 	}
   client.conversations.v1.services.create({friendlyName: req.body?.friendlyName, uniqueName: req.body?.uniqueName})
   .then(async (service: { sid: string; }) => {
@@ -140,7 +138,7 @@ app.post("/create-server", async (req, res) => {
   }); 
 });
 // Delete server
-app.post("/delete-server", async (req, res) => {
+app.post("/delete-server", async (req: { body: { serverSid: any; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (): void; new(): any; }; }; }) => {
   await supabase.from('channel_members').delete().match({ server_id: req.body?.serverSid })
   await supabase.from('channels').delete().match({ server_id: req.body?.serverSid })
   await supabase.from('server_members').delete().match({ server_id: req.body?.serverSid })
@@ -149,7 +147,7 @@ app.post("/delete-server", async (req, res) => {
   res.status(200).send()
 })
 // Get access-token
-app.post("/get-access-token", async (req, res) => {
+app.post("/get-access-token", async (req: { body: { jwt: string; serverSid: string; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (arg0: { accessToken: string; identity: any; }): any; new(): any; }; }; }) => {
   console.log(req.body)
   const jwt = req.body?.jwt as string
 	const SERVICE_SID = req.body?.serverSid as string
@@ -164,13 +162,13 @@ app.post("/get-access-token", async (req, res) => {
 	if (jwt.startsWith('anonymous')) {
 		identity = jwt.split('anonymous_')[1];
 	} else {
-		const { data } = await supabase.auth.api.getUser(jwt);
-		identity = data?.user_metadata.full_name;
+		const { data } = await supabase.auth.getUser(jwt);
+		identity = data?.user?.user_metadata.full_name;
 	}
 
 	if (identity == null )return res.status(401)
 
-	const accessToken = new AccessToken(accountSid, twilioApiKey, twilioApiSecret, {
+	const accessToken = new AccessToken(accountSid as string, twilioApiKey as string, twilioApiSecret as string, {
 		identity
 	});
   console.log(accessToken)
@@ -185,7 +183,7 @@ app.post("/get-access-token", async (req, res) => {
   });
 })
 // Create channel
-app.post("/create-channel", async (req, res) => {
+app.post("/create-channel", (req: { body: { serverSid: string; channelName: string; channelDescription: string; }; }, res: { send: (arg0: { conversation: { sid: string; }; }) => void; }) => {
   const serversid = req.body?.serverSid as string
   const channelname = req.body?.channelName as string
   const channeldescription = req.body?.channelDescription as string
@@ -196,7 +194,7 @@ app.post("/create-channel", async (req, res) => {
     try {
       await addToDatabase('channels',  { id: conversation.sid, server_id: serversid,friendly_name: channelname, description: channeldescription })
       // get members of server
-      const { data } = await supabase.from('server_members').select('user_id').match({ server_id: serversid })
+      await supabase.from('server_members').select('user_id').match({ server_id: serversid })
       res.send({ conversation: conversation })
     } catch (error) {
       res.send(error)
@@ -205,7 +203,7 @@ app.post("/create-channel", async (req, res) => {
   )
 })
 // Get User Conversations
-app.post("/get-user-conversations", async (req, res) => {
+app.post("/get-user-conversations", async (req: { body: { serversid: any; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (arg0: string|any[]): void; new(): any; }; }; }) => {
   console.log(req.body)
 
   const { data } = await supabase
@@ -227,7 +225,7 @@ app.post("/get-user-conversations", async (req, res) => {
     })});
 })
 // Get all servers
-app.post("/get-all-servers", async (req, res) => {
+app.post("/get-all-servers", (req: { body: any; }, res: { send: (arg0: { sid: string; }) => any; }) => {
   console.log(req.body)
 
   client.conversations.v1.services.list().then((services: { sid: string; }) => res.send(services)); 
@@ -235,7 +233,7 @@ app.post("/get-all-servers", async (req, res) => {
 // Get user servers
 
 // Add participant
-app.post("/add-participant", async (req, res) => {
+app.post("/add-participant", async (req: { body: { serverSid: any; conversationSid: any; identity: any; uid: any; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (): void; new(): any; }; }; }) => {
   console.log(req.body)
 
   console.log('serverSid:' ,req.body.serverSid)
@@ -256,7 +254,7 @@ app.post("/add-participant", async (req, res) => {
 })
 
 // Remove participant
-app.post("/remove-participant", async (req, res) => {
+app.post("/remove-participant", (req: { body: { serverSid: any; conversationSid: any; identity: any; uid: any; }; }, res: { status: (arg0: number) => { (): any; new(): any; send: { (): void; new(): any; }; }; }) => {
   console.log(req.body)
 
   console.log('serverSid:' ,req.body.serverSid)
