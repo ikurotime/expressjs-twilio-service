@@ -3,7 +3,7 @@ import cors from "npm:cors"
 import twilio from "npm:twilio";
 import bodyParser from "npm:body-parser";
 import express from "npm:express";
-import { createClient } from "npm:@supabase/supabase-js";
+import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 //const supabaseToken = Deno.env.get("SUPABASE_ANON_KEY");
